@@ -53,7 +53,9 @@ Follow your client's OAuth flow. A saved configuration is not proof of access: t
 
 The agent reads the current app repository for store identifiers and reuses matching registered apps. It can register apps, add an initial missing Apple `pt` campaign tag, create ready test links when campaign tags are known, and inspect reports. It reports unsupported changes to existing store destinations instead of replacing the app or its links.
 
-Google Play and App Store report access requires separate provider permissions and configuration in the private owner panel. Never paste provider keys, account passwords or OAuth codes into chat, this repository or plugin settings.
+Setup includes provider report connections from the start. Google Play and App Store report access requires separate provider permissions and configuration in the private owner panel. For Apple, an Admin creates an `ONGOING` report request; a `Sales and Reports` team key can read it. Select App Store Downloads Detailed for its `Campaign` (`ct`) dimension. The public `pt` campaign-link tag is independent of report access.
+
+To obtain `pt`: App Store Connect → Apps → your app → Analytics → Acquisition → Campaigns → **+**. Enter a campaign name, copy the generated link, and read its `pt=` value. Apple documents this one-time link-generation flow, not a public provider-token lookup API. See [Apple's instructions](https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links). Never paste provider keys, account passwords or OAuth codes into chat, this repository or plugin settings.
 
 A working redirect proves a link works; it does not prove an installation. Store visits, acquisitions, downloads and first opens are different metrics. Missing or suppressed data remains unknown. `doctor` does not import reports, trigger syncs or change configuration. Neither workflow changes active ads or budgets.
 

@@ -1,6 +1,6 @@
 {
   "name": "installtally",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Set up privacy-first app acquisition measurement and run read-only readiness diagnostics through MCP.",
   "author": {
     "name": "MYMOBI Roman Barzyczak",
