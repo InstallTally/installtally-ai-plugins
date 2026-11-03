@@ -9,6 +9,8 @@ Set up free, privacy-first app acquisition measurement from your app repository.
 | `setup` | Connect MCP, reuse or register apps, configure ready platforms and explain remaining inputs |
 | `doctor` | Read-only checks of access, app configuration, campaign readiness and report evidence |
 
+Setup first asks whether you want iOS, Android or both. Run it again to resume: it reads the existing app, links and report sources and requests only missing inputs or permissions. A report still being generated is reported as pending.
+
 One account can have multiple apps. Keep the iOS and Android versions of the same app in one product. An Apple campaign provider token can be added later; Android setup is independent.
 
 ## Claude Code
