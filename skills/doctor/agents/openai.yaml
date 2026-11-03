@@ -1,0 +1,3 @@
+interface:
+  display_name: "Diagnose InstallTally"
+  short_description: "Check app measurement without changing data"

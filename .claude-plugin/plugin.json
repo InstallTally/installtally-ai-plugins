@@ -1,0 +1,23 @@
+{
+  "name": "installtally",
+  "version": "0.1.0",
+  "description": "Set up privacy-first app acquisition measurement and run read-only readiness diagnostics through MCP.",
+  "author": {
+    "name": "MYMOBI Roman Barzyczak",
+    "url": "https://installtally.com"
+  },
+  "homepage": "https://installtally.com",
+  "license": "Apache-2.0",
+  "keywords": [
+    "app-analytics",
+    "privacy",
+    "mcp",
+    "ios",
+    "android"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "privacyPolicyUrl": "https://installtally.com/privacy/",
+  "icon": "./assets/icon.png",
+  "repository": "https://github.com/InstallTally/installtally-ai-plugins"
+}

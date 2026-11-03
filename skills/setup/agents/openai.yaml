@@ -1,0 +1,3 @@
+interface:
+  display_name: "Set up InstallTally"
+  short_description: "Connect MCP and configure app measurement"

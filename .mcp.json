@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "installtally": {
+      "type": "http",
+      "url": "https://api.installtally.com/mcp"
+    }
+  }
+}
