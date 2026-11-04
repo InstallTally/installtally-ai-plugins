@@ -18,11 +18,8 @@ FILES = (
     "LICENSE",
     "skills/setup/SKILL.md",
     "skills/setup/agents/openai.yaml",
-<<<<<<< HEAD
     "skills/setup/references/private-transfer.md",
     "scripts/private-companion.mjs",
-=======
->>>>>>> origin/main
     "scripts/check-plugin-version.mjs",
     "skills/doctor/SKILL.md",
     "skills/doctor/agents/openai.yaml",
