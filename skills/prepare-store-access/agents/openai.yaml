@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare store access"
+  short_description: "Prepare private store readers without exposing keys"
+  default_prompt: "Use $prepare-store-access to reuse or prepare this app's missing store reader access through the official local MCP companion."
