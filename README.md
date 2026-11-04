@@ -8,6 +8,10 @@ Set up free, privacy-first app acquisition measurement from your app repository.
 | --- | --- |
 | `setup` | Connect MCP, reuse or register apps, configure ready platforms and explain remaining inputs |
 | `doctor` | Read-only checks of access, app configuration, campaign readiness and report evidence |
+| `setup-google-play-reports` (preview) | Guide and resume authorized Play report access using actual server capabilities |
+| `setup-app-store-reports` (preview) | Guide Apple reader setup and bootstrap an initial report request with an approved local helper |
+
+The provider skills and local Apple helper are open source under Apache-2.0. They are in development: managed Google readers and Apple pending-reader storage are not enabled on the released service. The skills detect this limitation and retain the existing private owner forms. Helper tests use controlled API responses; native provider onboarding and scheduled-import acceptance remain outstanding. No preview skill is proof of live provider access.
 
 Setup first asks whether you want iOS, Android or both. Run it again to resume: it reads the existing app, links and report sources and requests only missing inputs or permissions. A report still being generated is reported as pending.
 
@@ -79,6 +83,8 @@ claude plugin validate .claude-plugin/plugin.json --strict --json
 claude plugin validate .claude-plugin/marketplace.json --strict --json
 python3 scripts/build_plugin.py --output dist/installtally-ai-plugin.zip
 ```
+
+The optional Apple bootstrap helper and its tests use Node.js 22.17+ or 24. Run `node --test tests/apple_bootstrap.test.mjs` in this repository. It reads an explicitly selected private manifest and key locally; an Admin key is never uploaded to InstallTally.
 
 Load a local checkout in Claude Code with `claude --plugin-dir /absolute/path/to/installtally-ai-plugins`. For Codex, register that directory with `codex plugin marketplace add /absolute/path/to/installtally-ai-plugins`, then install `installtally@installtally`.
 

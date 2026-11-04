@@ -24,6 +24,8 @@ jobs:
           .venv/bin/python -m pip install -r requirements-dev.txt
           .venv/bin/python -m pytest -q
           .venv/bin/python scripts/build_plugin.py --output dist/installtally-ai-plugin.zip
+      - name: Test the local Apple bootstrap helper
+        run: node --test tests/apple_bootstrap.test.mjs
       - name: Validate Claude plugin and marketplace
         run: |
           npx --yes @anthropic-ai/claude-code@2.1.317 plugin validate .claude-plugin/plugin.json --strict --json

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set up App Store reports"
+  short_description: "Connect and resume aggregate Apple download reports"
+  default_prompt: "Use $setup-app-store-reports to connect this app's aggregate App Store reports in InstallTally and verify the available data."

@@ -43,3 +43,5 @@ For automatic Apple reports, direct the owner to the product's **Connect App Sto
 Do not change ads/budgets, enable referral mode, export individual conversions, upload customer records or assign overall revenue to campaigns. Unknown metrics remain unknown. Scope any write to the user's requested setup; provider permissions and ad-account actions require their own authorization.
 
 References: https://installtally.com/docs/quickstart/ and https://installtally.com/docs/mcp/ .
+
+For the selected platforms, use the bundled [Google Play report workflow](../setup-google-play-reports/SKILL.md) and [App Store report workflow](../setup-app-store-reports/SKILL.md). These preview workflows inspect actual server capability and can assist through an authorized provider browser. The Apple workflow includes an optional approved local Admin bootstrap helper. Do not claim that a setup intent provisions Google readers or stores a pending Apple connection; these backend steps are still in development. Continue independently ready steps and report the exact remaining prerequisite.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set up Google Play reports"
+  short_description: "Connect and resume aggregate Play acquisition reports"
+  default_prompt: "Use $setup-google-play-reports to connect this app's aggregate Google Play reports in InstallTally and verify the available data."
