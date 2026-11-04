@@ -137,7 +137,7 @@ export async function serve() {
       let result;
       if (message.method === 'initialize') {
         if (!['2024-11-05', '2025-03-26', '2025-06-18', '2025-11-25'].includes(message.params?.protocolVersion)) fail('protocol');
-        result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'installtally-private', version: '0.1.8' } };
+        result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'installtally-private', version: '0.1.9' } };
       } else if (message.method === 'ping') result = {};
       else if (message.method === 'tools/list') result = { tools };
       else if (message.method === 'tools/call') {

@@ -184,7 +184,7 @@ test('MCP exposes version checking without shell access, credential reads or upd
   const preload = join(directory, 'release-fixture.mjs');
   await writeFile(preload, `globalThis.fetch = async (url, options) => {
     if (url !== 'https://api.github.com/repos/InstallTally/installtally-ai-plugins/releases/latest' || options.method !== 'GET' || Object.keys(options.headers).some(k => k.toLowerCase() === 'authorization')) throw Error('PRIVATE_ERROR');
-    return new Response(JSON.stringify({ tag_name: 'v0.1.8', draft: false, prerelease: false }), { headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ tag_name: 'v0.1.9', draft: false, prerelease: false }), { headers: { 'content-type': 'application/json' } });
   };`);
   const child = spawn(process.execPath, ['--import', preload, 'scripts/private-companion.mjs']);
   let stdout = '', stderr = '';
@@ -194,7 +194,7 @@ test('MCP exposes version checking without shell access, credential reads or upd
   const reply = JSON.parse(stdout); assert.ok(reply.result, stdout); assert.equal(reply.result.isError, undefined, stdout);
   const value = JSON.parse(reply.result.content[0].text);
   assert.ok(['current', 'update_available'].includes(value.status));
-  assert.equal(value.latest_version, '0.1.8');
+  assert.equal(value.latest_version, '0.1.9');
   assert.equal(stderr, ''); assert.ok(!stdout.includes('PRIVATE_ERROR'));
 });
 
