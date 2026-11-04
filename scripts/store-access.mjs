@@ -94,6 +94,23 @@ export async function inspectGoogleContext({ run = runGcloud } = {}) {
       provider_authorization_verified: false };
   } catch { fail('local_context_unavailable'); }
 }
+export async function listGoogleReaderCandidates({ account, project_id }, { run = runGcloud } = {}) {
+  if (typeof account !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9@._+-]{2,253}$/.test(account)
+    || typeof project_id !== 'string' || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project_id)) fail('configuration');
+  try {
+    const { stdout } = await run('gcloud', ['iam', 'service-accounts', 'list',
+      '--project=' + project_id, '--account=' + account, '--limit=101', '--format=json(email,disabled)', '--quiet']);
+    if (typeof stdout !== 'string' || Buffer.byteLength(stdout) > 32768) fail('reader_discovery_unavailable');
+    const rows = JSON.parse(stdout);
+    if (!Array.isArray(rows) || rows.length > 101) fail('reader_discovery_unavailable');
+    const candidates = rows.slice(0, 100).filter(row => row && typeof row.email === 'string'
+      && /^[a-z][a-z0-9-]{4,28}[a-z0-9]@/.test(row.email)
+      && row.email.endsWith('@' + project_id + '.iam.gserviceaccount.com')
+      && (row.disabled === undefined || typeof row.disabled === 'boolean'))
+      .map(row => ({ service_account: row.email, disabled: row.disabled === true }));
+    return { account, project_id, candidates, truncated: rows.length > 100, provider_access_verified: false };
+  } catch { fail('reader_discovery_unavailable'); }
+}
 async function verifyGoogleKey(path, project, account) {
   const value = JSON.parse(await privateFile(path));
   if (value.type !== 'service_account' || value.project_id !== project || value.client_email !== account

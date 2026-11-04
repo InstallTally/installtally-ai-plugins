@@ -156,6 +156,7 @@ for (const name of ['CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT', 'CLOUDSDK_AUTH_
   if (process.env[name] !== '') process.exit(2);
 }
 if (args[0] === 'config') console.log(args[2] === 'core/account' ? 'owner@example.test' : 'owned-project');
+else if (args[2] === 'list') console.log(JSON.stringify([{ email: 'reader@owned-project.iam.gserviceaccount.com', disabled: false, private_key: 'PRIVATE_NEVER_RETURN' }]));
 else {
   if (!args.includes('--account=owner@example.test') || !args.includes('--quiet')) process.exit(3);
   writeFileSync(args[4], ${JSON.stringify(JSON.stringify(googleKey))}, { mode: 0o644 });
@@ -170,16 +171,64 @@ console.error('PRIVATE_CLI_ERROR');\n`;
   child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
   child.stdin.end([
     { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'inspect_google_context', arguments: {} } },
-    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'create_google_reader_key', arguments: google(f) } }
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'list_google_reader_candidates', arguments: { account: 'owner@example.test', project_id: 'owned-project' } } },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'create_google_reader_key', arguments: google(f) } }
   ].map(JSON.stringify).join('\n') + '\n');
   await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
   const replies = stdout.trim().split('\n').map(JSON.parse);
   assert.equal(replies[0].result.isError, undefined, stdout);
   assert.equal(JSON.parse(replies[0].result.content[0].text).account, 'owner@example.test');
   assert.equal(replies[1].result.isError, undefined, stdout);
-  const prepared = JSON.parse(replies[1].result.content[0].text);
+  const candidates = JSON.parse(replies[1].result.content[0].text);
+  assert.deepEqual(candidates.candidates, [{ service_account: 'reader@owned-project.iam.gserviceaccount.com', disabled: false }]);
+  assert.equal(replies[2].result.isError, undefined, stdout);
+  const prepared = JSON.parse(replies[2].result.content[0].text);
   assert.equal(prepared.state, 'reader_prepared');
   assert.equal((await stat(prepared.credential_file)).mode & 0o777, 0o600);
   assert.equal(stderr, '');
-  assert.doesNotMatch(stdout, /PRIVATE_CLI|PRIVATE_AMBIENT|BEGIN PRIVATE KEY/);
+  assert.doesNotMatch(stdout, /PRIVATE_CLI|PRIVATE_AMBIENT|PRIVATE_NEVER_RETURN|BEGIN PRIVATE KEY/);
+});
+
+test('reader discovery lists only bounded metadata for the exact account/project; project names do not determine Play access', async () => {
+  const { listGoogleReaderCandidates } = await import('../scripts/store-access.mjs');
+  const result = await listGoogleReaderCandidates({ account: 'support@example.test', project_id: 'different-app-project' }, {
+    run: async (command, args) => {
+      assert.equal(command, 'gcloud');
+      assert.deepEqual(args.slice(0, 3), ['iam', 'service-accounts', 'list']);
+      assert.ok(args.includes('--project=different-app-project'));
+      assert.ok(args.includes('--account=support@example.test'));
+      assert.ok(args.includes('--limit=101'));
+      assert.ok(args.includes('--quiet'));
+      assert.ok(!args.some(x => /keys|token|login/.test(x)));
+      return { stdout: JSON.stringify([
+        { email: 'reader@different-app-project.iam.gserviceaccount.com', disabled: false, displayName: 'PRIVATE_UNTRUSTED_TEXT', private_key: 'PRIVATE_NEVER_RETURN' },
+        { email: 'other@another-project.iam.gserviceaccount.com', disabled: false },
+        { email: 'disabled@different-app-project.iam.gserviceaccount.com', disabled: true }
+      ]) };
+    }
+  });
+  assert.deepEqual(result.candidates, [
+    { service_account: 'reader@different-app-project.iam.gserviceaccount.com', disabled: false },
+    { service_account: 'disabled@different-app-project.iam.gserviceaccount.com', disabled: true }
+  ]);
+  assert.equal(result.account, 'support@example.test');
+  assert.equal(result.project_id, 'different-app-project');
+  assert.equal(result.provider_access_verified, false);
+  assert.equal(result.truncated, false);
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_'));
+});
+
+test('reader discovery rejects ambiguous targets and safely handles malformed, denied and bounded results', async () => {
+  const { listGoogleReaderCandidates } = await import('../scripts/store-access.mjs');
+  const args = { account: 'owner@example.test', project_id: 'owned-project' };
+  await assert.rejects(listGoogleReaderCandidates({ ...args, project_id: '--malicious' }, { run: () => assert.fail() }), /configuration/);
+  for (const stdout of ['invalid PRIVATE_DATA', '{}', 'x'.repeat(32769)]) {
+    await assert.rejects(listGoogleReaderCandidates(args, { run: async () => ({ stdout }) }), /reader_discovery_unavailable/);
+  }
+  await assert.rejects(listGoogleReaderCandidates(args, { run: async () => { throw Error('PRIVATE_ERROR'); } }), error => {
+    assert.match(error.message, /reader_discovery_unavailable/); assert.ok(!error.message.includes('PRIVATE_ERROR')); return true;
+  });
+  const many = Array.from({ length: 101 }, (_, i) => ({ email: `reader-${i}@owned-project.iam.gserviceaccount.com` }));
+  const bounded = await listGoogleReaderCandidates(args, { run: async () => ({ stdout: JSON.stringify(many) }) });
+  assert.equal(bounded.candidates.length, 100); assert.equal(bounded.truncated, true);
 });

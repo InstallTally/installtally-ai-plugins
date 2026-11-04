@@ -9,7 +9,7 @@ Run read-only checks through the existing selected connection. Do not install a 
 
 ## Check the loaded plugin version
 
-Once per top-level doctor, run the bundled [version checker](../../scripts/check-plugin-version.mjs) from the loaded plugin's absolute path. Reuse the current invocation's setup result when present. It reads only own manifests and public release metadata. `current`/`ahead`: no update question or downgrade. `update_available`: report installed/latest and release URL, offer an update as a separate action; doctor never installs or updates. `unknown`, offline or missing Node: report unverified/NOT RUN and continue authorized diagnostics. Never request GitHub credentials or install a runtime. Do not claim an old installed skill has acquired a new preflight without a one-time update and new session.
+Once per top-level doctor, call local MCP `check_plugin_version`. It runs the bundled [version checker](../../scripts/check-plugin-version.mjs) without shell access. If that tool is unavailable, use the bundled Node script only when local execution is available; otherwise report NOT RUN and continue authorized diagnostics. Reuse the current invocation's setup result when present. It reads only own manifests and public release metadata. `current`/`ahead`: no update question or downgrade. `update_available`: report installed/latest and release URL, offer an update as a separate action; doctor never installs or updates. `unknown`, offline or missing Node: report unverified/NOT RUN and continue authorized diagnostics. Never request GitHub credentials or install a runtime. Do not claim an old installed skill has acquired a new preflight without a one-time update and new session.
 
 Never open a browser or login/consent URL. Missing authorization is a blocker, not permission to start a login flow.
 
@@ -29,6 +29,6 @@ Keep these observations separate:
 - Worker heartbeat, queued/retry/error state, last successful import, provider reporting date and coverage. Waiting does not mean fresh. A successful empty import is not a measured zero.
 - Provider metrics: store visits/clicks, acquisitions, downloads/redownloads and first opens are different. Do not add overlapping sources or currencies. Missing revenue stays unknown; no unsupported CPI/ROAS.
 
-Return a compact table: check, PASS/FAIL/NOT RUN, source/date evidence, next action. Missing or suppressed evidence is unknown, not zero. Report a partial result when checks cannot run; never mark overall readiness while required access or coverage remains unverified. Recommend fixes without executing them.
+Return a compact table: check, PASS/FAIL/NOT RUN, source/date evidence, next action. For actual import verification, use NOT RUN when no reader/source is configured and no import could be attempted; describe the missing prerequisite. An attempted import/check with a concrete error can FAIL. Configuration readiness may fail separately when a required source is absent. Missing or suppressed evidence is unknown, not zero. Report a partial result when checks cannot run; never mark overall readiness while required access or coverage remains unverified. Recommend fixes without executing them.
 
 Reference: https://installtally.com/guides/why-app-install-data-is-missing/ .
