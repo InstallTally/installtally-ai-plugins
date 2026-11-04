@@ -20,6 +20,11 @@ FILES = (
     "skills/setup/agents/openai.yaml",
     "skills/doctor/SKILL.md",
     "skills/doctor/agents/openai.yaml",
+    "skills/setup-google-play-reports/SKILL.md",
+    "skills/setup-google-play-reports/agents/openai.yaml",
+    "skills/setup-app-store-reports/SKILL.md",
+    "skills/setup-app-store-reports/agents/openai.yaml",
+    "skills/setup-app-store-reports/scripts/apple-bootstrap.mjs",
     "assets/icon.png",
 )
 
