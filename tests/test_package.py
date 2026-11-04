@@ -44,6 +44,7 @@ def test_actual_package_build_is_reproducible_and_excludes_private_files(
         assert "installtally-ai-plugin/skills/setup-app-store-reports/SKILL.md" in names
         assert "installtally-ai-plugin/skills/setup-app-store-reports/scripts/apple-bootstrap.mjs" in names
         assert "installtally-ai-plugin/.mcp.json" in names
+        assert "installtally-ai-plugin/scripts/check-plugin-version.mjs" in names
         assert not any(
             "private" in name or name.endswith(".env") or name.startswith("installtally-ai-plugin/reports/")
             for name in names
