@@ -19,6 +19,10 @@ Use version 0.1.4 or later for private MCP transfer and start a new agent sessio
 
 One account can have multiple apps. Keep the iOS and Android versions of the same app in one product. An Apple campaign provider token can be added later; Android setup is independent.
 
+## Version preflight
+
+The0.1.4candidate checks its own installed manifests against the latest stable public GitHub release once per setup/doctor invocation. It sends no credentials and executes no update. Only a newer stable release prompts an update offer; offline/rate-limited/unknown checks continue without claiming current. Owner-approved updates require a new session. Doctor stays read-only and offers updates as a separate action. Older installations need one update/new session to acquire this preflight. No auto-update setting is changed. Node22.17+ or24 is required; a missing runtime leaves the check NOT RUN rather than installing software automatically.
+
 ## Claude Code
 
 ```sh

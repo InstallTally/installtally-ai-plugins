@@ -13,6 +13,10 @@ Once per top-level doctor, run the bundled [version checker](../../scripts/check
 
 Never open a browser or login/consent URL. Missing authorization is a blocker, not permission to start a login flow.
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
 ## Establish the target
 
 Inspect client MCP connection state and available tools using the current client's documented read controls. Verify actual authenticated access with `list_products`; public health200 is insufficient. Select the product requested by the user. If multiple products/workspaces match, report the ambiguity before app-specific checks. Do not imply access to unrelated workspaces or provider accounts.
