@@ -191,28 +191,28 @@ console.error('PRIVATE_CLI_ERROR');\n`;
 
 test('reader discovery lists only bounded metadata for the exact account/project; project names do not determine Play access', async () => {
   const { listGoogleReaderCandidates } = await import('../scripts/store-access.mjs');
-  const result = await listGoogleReaderCandidates({ account: 'support@himommyapp.com', project_id: 'coloranalysis-482115' }, {
+  const result = await listGoogleReaderCandidates({ account: 'support@example.test', project_id: 'different-app-project' }, {
     run: async (command, args) => {
       assert.equal(command, 'gcloud');
       assert.deepEqual(args.slice(0, 3), ['iam', 'service-accounts', 'list']);
-      assert.ok(args.includes('--project=coloranalysis-482115'));
-      assert.ok(args.includes('--account=support@himommyapp.com'));
+      assert.ok(args.includes('--project=different-app-project'));
+      assert.ok(args.includes('--account=support@example.test'));
       assert.ok(args.includes('--limit=101'));
       assert.ok(args.includes('--quiet'));
       assert.ok(!args.some(x => /keys|token|login/.test(x)));
       return { stdout: JSON.stringify([
-        { email: 'reader@coloranalysis-482115.iam.gserviceaccount.com', disabled: false, displayName: 'PRIVATE_UNTRUSTED_TEXT', private_key: 'PRIVATE_NEVER_RETURN' },
+        { email: 'reader@different-app-project.iam.gserviceaccount.com', disabled: false, displayName: 'PRIVATE_UNTRUSTED_TEXT', private_key: 'PRIVATE_NEVER_RETURN' },
         { email: 'other@another-project.iam.gserviceaccount.com', disabled: false },
-        { email: 'disabled@coloranalysis-482115.iam.gserviceaccount.com', disabled: true }
+        { email: 'disabled@different-app-project.iam.gserviceaccount.com', disabled: true }
       ]) };
     }
   });
   assert.deepEqual(result.candidates, [
-    { service_account: 'reader@coloranalysis-482115.iam.gserviceaccount.com', disabled: false },
-    { service_account: 'disabled@coloranalysis-482115.iam.gserviceaccount.com', disabled: true }
+    { service_account: 'reader@different-app-project.iam.gserviceaccount.com', disabled: false },
+    { service_account: 'disabled@different-app-project.iam.gserviceaccount.com', disabled: true }
   ]);
-  assert.equal(result.account, 'support@himommyapp.com');
-  assert.equal(result.project_id, 'coloranalysis-482115');
+  assert.equal(result.account, 'support@example.test');
+  assert.equal(result.project_id, 'different-app-project');
   assert.equal(result.provider_access_verified, false);
   assert.equal(result.truncated, false);
   assert.ok(!JSON.stringify(result).includes('PRIVATE_'));
