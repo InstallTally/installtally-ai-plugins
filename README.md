@@ -11,7 +11,7 @@ Set up free, privacy-first app acquisition measurement from your app repository.
 | `setup-google-play-reports` (preview) | Guide and resume authorized Play report access using actual server capabilities |
 | `setup-app-store-reports` (preview) | Guide Apple reader setup and bootstrap an initial report request with an approved local helper |
 
-The provider skills and local helpers are open source under Apache-2.0. This0.1.4candidate adds MCP-driven private reader transfer and resume/discovery, without browser fallback. The hosted release is still 0.1.3 and does not enable this new transfer. Native client/provider and scheduled-import acceptance remain outstanding. No preview skill proves live provider access.
+The provider skills and local helpers are open source under Apache-2.0. Version 0.1.4 supports private reader transfer and resumable store setup through MCP, without a browser fallback. The hosted preview enables this workflow. Local MCP connections were checked in Codex and Claude; real owner-authorized provider imports, later scheduled imports and the complete model-led account/provider flow remain unverified. A saved reader or connected source is not proof of installation counts.
 
 Setup first asks whether you want iOS, Android or both. Run it again to resume: it reads the existing app, links and report sources and requests only missing inputs or permissions. A report still being generated is reported as pending.
 
@@ -38,6 +38,24 @@ codex plugin add installtally@installtally
 ```
 
 Start a new task and ask: **“Load the setup skill from the InstallTally plugin for this app, then load its selected store-report skills.”** For diagnosis, ask for the plugin's `doctor` skill. To update an older install, run `codex plugin marketplace upgrade installtally`, then `codex plugin add installtally@installtally`, and start a new session. Client installation may ask you to trust this marketplace. If your client lacks plugins, the direct MCP connection below provides data tools; install the official skills separately before using the guided store workflows.
+
+## GitHub SSH errors during updates
+
+If an update fails with `git@github.com: Permission denied (publickey)`, check how Git resolves the public marketplace URL:
+
+```sh
+git ls-remote --get-url https://github.com/InstallTally/installtally-ai-plugins.git
+```
+
+If this prints an SSH URL, a Git `url.*.insteadOf` rule is rewriting HTTPS. You can keep the general rule and add an HTTPS exception scoped to this public repository:
+
+```sh
+git config --global --add url."https://github.com/InstallTally/installtally-ai-plugins.git".insteadOf "https://github.com/InstallTally/installtally-ai-plugins.git"
+codex plugin marketplace upgrade installtally
+codex plugin add installtally@installtally
+```
+
+Git uses the longest matching URL prefix, so the repository-specific exception preserves HTTPS for InstallTally while leaving other repositories' routing intact. This public repository does not require an SSH key. Restart the client session after updating; never share a private key or token in chat.
 
 ## Direct MCP connection
 
