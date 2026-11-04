@@ -184,7 +184,7 @@ test('MCP exposes version checking without shell access, credential reads or upd
   const preload = join(directory, 'release-fixture.mjs');
   await writeFile(preload, `globalThis.fetch = async (url, options) => {
     if (url !== 'https://api.github.com/repos/InstallTally/installtally-ai-plugins/releases/latest' || options.method !== 'GET' || Object.keys(options.headers).some(k => k.toLowerCase() === 'authorization')) throw Error('PRIVATE_ERROR');
-    return new Response(JSON.stringify({ tag_name: 'v0.1.7', draft: false, prerelease: false }), { headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify({ tag_name: 'v0.1.8', draft: false, prerelease: false }), { headers: { 'content-type': 'application/json' } });
   };`);
   const child = spawn(process.execPath, ['--import', preload, 'scripts/private-companion.mjs']);
   let stdout = '', stderr = '';
@@ -194,6 +194,25 @@ test('MCP exposes version checking without shell access, credential reads or upd
   const reply = JSON.parse(stdout); assert.ok(reply.result, stdout); assert.equal(reply.result.isError, undefined, stdout);
   const value = JSON.parse(reply.result.content[0].text);
   assert.ok(['current', 'update_available'].includes(value.status));
-  assert.equal(value.latest_version, '0.1.7');
+  assert.equal(value.latest_version, '0.1.8');
   assert.equal(stderr, ''); assert.ok(!stdout.includes('PRIVATE_ERROR'));
+});
+
+test('MCP Google authorization failure returns an actionable blocker instead of requesting nonexistent reader paths', async t => {
+  const { directory } = await fixture(t), bin = join(directory, 'bin');
+  const { mkdir } = await import('node:fs/promises'); await mkdir(bin, { mode: 0o700 });
+  await writeFile(join(bin, 'gcloud'), `#!${process.execPath}\nconsole.error('ERROR: Reauthentication failed. cannot prompt during non-interactive execution. PRIVATE_TOKEN_AND_PATH');process.exit(1);`, { mode: 0o700 });
+  const child = spawn(process.execPath, ['scripts/private-companion.mjs'], { env: { ...process.env, PATH: bin + ':' + process.env.PATH } });
+  let stdout = '', stderr = '';
+  child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
+  child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_google_reader_candidates', arguments: { account: 'owner@example.test', project_id: 'owned-project' } } }) + '\n');
+  await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
+  const reply = JSON.parse(stdout); assert.equal(reply.result.isError, true);
+  const blocker = JSON.parse(reply.result.content[0].text);
+  assert.equal(blocker.error_code, 'needs_google_authorization');
+  assert.equal(blocker.state, 'waiting_for_provider_authorization');
+  assert.equal(blocker.request_reader_paths, false);
+  assert.equal(blocker.retry_without_changes, false);
+  assert.equal(typeof blocker.next_action, 'string'); assert.ok(blocker.next_action.length > 0);
+  assert.equal(stderr, ''); assert.doesNotMatch(stdout, /PRIVATE_TOKEN|PRIVATE_MESSAGE|PRIVATE_SECRET/);
 });
