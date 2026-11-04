@@ -6,7 +6,7 @@ import { isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { bootstrap, BootstrapError, loadCredential } from '../skills/setup-app-store-reports/scripts/apple-bootstrap.mjs';
-import { prepareAppleReader, createGoogleReaderKey, inspectGoogleContext, listGoogleReaderCandidates, StoreAccessError } from './store-access.mjs';
+import { prepareAppleReader, createGoogleReaderKey, inspectGoogleContext, listGoogleReaderCandidates, StoreAccessError, storeAccessBlocker } from './store-access.mjs';
 import { checkPluginVersion, installedVersion } from './check-plugin-version.mjs';
 
 const AAD = Buffer.from('installtally-private-handoff-v1');
@@ -137,7 +137,7 @@ export async function serve() {
       let result;
       if (message.method === 'initialize') {
         if (!['2024-11-05', '2025-03-26', '2025-06-18', '2025-11-25'].includes(message.params?.protocolVersion)) fail('protocol');
-        result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'installtally-private', version: '0.1.7' } };
+        result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'installtally-private', version: '0.1.8' } };
       } else if (message.method === 'ping') result = {};
       else if (message.method === 'tools/list') result = { tools };
       else if (message.method === 'tools/call') {
@@ -165,8 +165,8 @@ export async function serve() {
           result = { content: [{ type: 'text', text: JSON.stringify(value) }] };
         } catch (error) {
           // Only helper-defined codes are safe; never serialize provider errors or file paths.
-          const text = (name === 'bootstrap_apple_reports' && error instanceof BootstrapError) || error instanceof StoreAccessError
-            ? JSON.stringify({ error_code: error.code })
+          const text = error instanceof StoreAccessError ? JSON.stringify(storeAccessBlocker(error))
+            : name === 'bootstrap_apple_reports' && error instanceof BootstrapError ? JSON.stringify({ error_code: error.code })
             : 'Private MCP operation did not complete. Check the selected private file, permission, setup status and authorization; secrets are never returned.';
           result = { isError: true, content: [{ type: 'text', text }] };
         }

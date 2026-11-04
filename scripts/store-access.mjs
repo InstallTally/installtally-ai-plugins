@@ -10,6 +10,35 @@ export class StoreAccessError extends Error {
   constructor(code) { super(`Store access preparation failed (${code})`); this.code = code; }
 }
 const fail = code => { throw new StoreAccessError(code); };
+function googleReadFailure(error, fallback) {
+  if (error?.code === 'ENOENT') return 'gcloud_not_installed';
+  if (error?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return fallback;
+  if (error?.code === 'ETIMEDOUT' || error?.killed === true) return 'google_metadata_timeout';
+  // Classify privately into fixed codes. Never expose provider text or infer
+  // authentication failure from generic "gcloud auth login" advice alone.
+  const stderr = typeof error?.stderr === 'string' ? error.stderr.slice(0, 32768).toLowerCase() : '';
+  if (/service_disabled|api[^\n]*(?:has not been used|not enabled|is disabled)/.test(stderr)) return 'needs_google_iam_api';
+  if (/invalid_grant|invalid_rapt|reauthentication|problem refreshing[^\n]*auth|refresherror|no active account|do not currently have an active account|no valid credentials|credentials[^\n]*expired|token[^\n]*expired/.test(stderr)) return 'needs_google_authorization';
+  if (/permission_denied|permission[^\n]*denied|\b403\b/.test(stderr)) return 'needs_google_iam_permission';
+  if (/not_found|project[^\n]*not found|\b404\b/.test(stderr)) return 'needs_google_project_selection';
+  return fallback;
+}
+export function storeAccessBlocker(error) {
+  if (!(error instanceof StoreAccessError)) return null;
+  const actions = {
+    needs_google_authorization: ['waiting_for_provider_authorization', 'Restore existing authorized local Google access for the selected account, or select an already-authorized alternative. Do not start a browser/login flow or request nonexistent previously approved reader paths.'],
+    needs_google_iam_permission: ['waiting_for_provider_permission', 'The selected local account cannot list IAM reader metadata. Obtain the specific metadata-read authority separately or identify an already-authorized reader; discovery failure does not prove a reader is absent.'],
+    needs_google_iam_api: ['waiting_for_provider_api', 'The selected project needs its IAM API prerequisite resolved by its owner. Do not enable APIs or create credentials automatically.'],
+    needs_google_project_selection: ['waiting_for_project_selection', 'Verify the exact selected Cloud project and its availability to the selected account. Do not choose an app or reader from the project name.'],
+    gcloud_not_installed: ['waiting_for_local_tool', 'Make the supported local Google CLI available through an authorized setup action, or select an already-approved reader. Do not install software automatically.'],
+    google_metadata_timeout: ['waiting_for_provider_diagnostics', 'Report that metadata discovery timed out. Do not infer missing readers, repeat automatically or request nonexistent file paths.'],
+    reader_discovery_unavailable: ['waiting_for_provider_diagnostics', 'Report that metadata discovery did not complete; its cause is unverified. Do not infer missing readers or request supposedly previously approved paths.'],
+    local_context_unavailable: ['waiting_for_provider_diagnostics', 'The current local Google context could not be inspected. Report that prerequisite without assuming reader files exist.']
+  };
+  const action = actions[error.code];
+  return action ? { error_code: error.code, state: action[0], request_reader_paths: false,
+    retry_without_changes: false, next_action: action[1] } : { error_code: error.code };
+}
 const fingerprint = values => createHash('sha256').update(JSON.stringify(values)).digest('hex').slice(0, 24);
 const result = (credential_file, reused) => ({ state: 'reader_prepared', credential_file, reused,
   provider_access_verified: false, transfer_authorized: false });
@@ -92,14 +121,17 @@ export async function inspectGoogleContext({ run = runGcloud } = {}) {
     return { account: /^[A-Za-z0-9][A-Za-z0-9@._+-]{2,253}$/.test(account) ? account : null,
       project_id: /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project) ? project : null,
       provider_authorization_verified: false };
-  } catch { fail('local_context_unavailable'); }
+  } catch (error) { fail(googleReadFailure(error, 'local_context_unavailable')); }
 }
 export async function listGoogleReaderCandidates({ account, project_id }, { run = runGcloud } = {}) {
   if (typeof account !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9@._+-]{2,253}$/.test(account)
     || typeof project_id !== 'string' || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project_id)) fail('configuration');
+  let stdout;
   try {
-    const { stdout } = await run('gcloud', ['iam', 'service-accounts', 'list',
-      '--project=' + project_id, '--account=' + account, '--limit=101', '--format=json(email,disabled)', '--quiet']);
+    ({ stdout } = await run('gcloud', ['iam', 'service-accounts', 'list',
+      '--project=' + project_id, '--account=' + account, '--limit=101', '--format=json(email,disabled)', '--quiet']));
+  } catch (error) { fail(googleReadFailure(error, 'reader_discovery_unavailable')); }
+  try {
     if (typeof stdout !== 'string' || Buffer.byteLength(stdout) > 32768) fail('reader_discovery_unavailable');
     const rows = JSON.parse(stdout);
     if (!Array.isArray(rows) || rows.length > 101) fail('reader_discovery_unavailable');

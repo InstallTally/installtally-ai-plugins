@@ -232,3 +232,34 @@ test('reader discovery rejects ambiguous targets and safely handles malformed, d
   const bounded = await listGoogleReaderCandidates(args, { run: async () => ({ stdout: JSON.stringify(many) }) });
   assert.equal(bounded.candidates.length, 100); assert.equal(bounded.truncated, true);
 });
+
+test('discovery distinguishes unavailable authorization, IAM permission, disabled API and invalid project without exposing errors', async () => {
+  const { listGoogleReaderCandidates } = await import('../scripts/store-access.mjs');
+  const args = { account: 'owner@example.test', project_id: 'owned-project' };
+  for (const [code, stderr, expected] of [
+    ['ENOENT', 'PRIVATE_BINARY_PATH', 'gcloud_not_installed'],
+    [1, 'ERROR: There was a problem refreshing your current auth tokens: invalid_grant. Reauthentication is needed. PRIVATE_SECRET', 'needs_google_authorization'],
+    [1, 'ERROR: Reauthentication failed. cannot prompt during non-interactive execution. PRIVATE_SECRET', 'needs_google_authorization'],
+    [1, 'ERROR: PERMISSION_DENIED: 403: permission iam.serviceAccounts.list denied. To authenticate run gcloud auth login. PRIVATE_SECRET', 'needs_google_iam_permission'],
+    [1, 'ERROR: PERMISSION_DENIED: 403: IAM API has not been used or it is disabled. reason: SERVICE_DISABLED. PRIVATE_SECRET', 'needs_google_iam_api'],
+    [1, 'ERROR: NOT_FOUND: The project was not found. PRIVATE_SECRET', 'needs_google_project_selection'],
+    ['ETIMEDOUT', 'PRIVATE_NETWORK_DETAIL', 'google_metadata_timeout']
+  ]) {
+    await assert.rejects(listGoogleReaderCandidates(args, { run: async () => { throw Object.assign(new Error('PRIVATE_MESSAGE'), { code, stderr }); } }), error => {
+      assert.equal(error.code, expected);
+      assert.ok(!error.message.includes('PRIVATE_')); return true;
+    });
+  }
+});
+
+test('oversized CLI output and generic login advice remain unknown rather than misclassified', async () => {
+  const { listGoogleReaderCandidates } = await import('../scripts/store-access.mjs');
+  for (const failure of [
+    { code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER', killed: true, stderr: 'PRIVATE_OUTPUT' },
+    { code: 1, stderr: 'For authentication help, run gcloud auth login. PRIVATE_DETAIL' }
+  ]) {
+    await assert.rejects(listGoogleReaderCandidates({ account: 'owner@example.test', project_id: 'owned-project' }, {
+      run: async () => { throw Object.assign(new Error('PRIVATE_DETAIL'), failure); }
+    }), error => error.code === 'reader_discovery_unavailable' && !error.message.includes('PRIVATE_'));
+  }
+});
