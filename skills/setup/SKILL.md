@@ -17,11 +17,11 @@ Use the current working OAuth connection and verify `list_products`; preserve un
 
 Load [private MCP credential transfer](references/private-transfer.md) before connecting store credentials. It explains loading the official local companion and recipient-bound transfer without exposing keys to the model. If a required tool is unavailable on the actual server/client, stop that workflow and report the missing capability; never fall back to a browser.
 
-## Choose the platforms and resume existing work
+## Detect the platforms and resume existing work
 
-For a new setup, ask **iOS / Android / both** before any configuration write, unless the user already selected the platforms in their request. Do not infer consent to configure both just because both exist in the repository. On a repeat run reuse the known selection and existing app; ask only when the target or requested platform change is ambiguous. Preserve any platform outside the selected scope.
+Start discovery immediately; do not ask an opening **iOS / Android / both** question. Preserve the user's explicit platform scope, including a previously selected scope when resuming. Otherwise inspect this repository's real store IDs and compare the matching registered app: configure both when both platforms have verified IDs, or the single verified platform. A platform folder or sample ID alone is not sufficient evidence. Ask only when IDs conflict, multiple apps/workspaces match or no reliable platform evidence is available. Preserve platforms outside an explicit selection; do not duplicate products to add unsupported destinations.
 
-Treat setup as a resumable workflow: platform choice → verified store identifiers → matching registered app → missing campaign settings → private report API access → first report evidence → doctor. Read current state on each run. Do not restart completed steps, ask for saved inputs again or replace apps/links to work around an unsupported edit. When both platforms were selected, collect both identifiers before registering the app rather than creating separate or incomplete replacement products.
+Treat setup as a resumable workflow: repository and existing-state discovery → resolved platform scope → matching registered app → missing campaign settings → private report API access → first report evidence → doctor. Read current state on each run. Announce the resolved platforms and immediately load their provider skills; do not wait for redundant confirmation. Do not restart completed steps, ask for saved inputs again or replace apps/links to work around an unsupported edit. When configuring both platforms, collect both identifiers before registering the app. Platform detection does not authorize provider key creation, IAM changes or Apple Admin bootstrap; obtain any required action-specific approval through the provider skill.
 
 ## Load the selected provider skills
 
