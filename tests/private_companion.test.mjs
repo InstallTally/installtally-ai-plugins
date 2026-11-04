@@ -174,7 +174,26 @@ test('actual stdio MCP initializes and advertises local private-transfer and App
   await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
   assert.equal(stderr, ''); const replies = stdout.trim().split('\n').map(JSON.parse);
   assert.equal(replies[0].result.protocolVersion, '2025-03-26');
-  assert.deepEqual(replies[1].result.tools.map(x => x.name), ['inspect_google_context', 'prepare_apple_reader', 'create_google_reader_key', 'prepare_private_transfer', 'complete_private_transfer', 'cancel_private_transfer', 'bootstrap_apple_reports']);
+  assert.deepEqual(replies[1].result.tools.map(x => x.name), ['check_plugin_version', 'inspect_google_context', 'list_google_reader_candidates', 'prepare_apple_reader', 'create_google_reader_key', 'prepare_private_transfer', 'complete_private_transfer', 'cancel_private_transfer', 'bootstrap_apple_reports']);
   assert(!stdout.includes('"private_key"'));
   assert(!stdout.includes('BEGIN PRIVATE KEY'));
+});
+
+test('MCP exposes version checking without shell access, credential reads or update execution', async t => {
+  const { directory } = await fixture(t);
+  const preload = join(directory, 'release-fixture.mjs');
+  await writeFile(preload, `globalThis.fetch = async (url, options) => {
+    if (url !== 'https://api.github.com/repos/InstallTally/installtally-ai-plugins/releases/latest' || options.method !== 'GET' || Object.keys(options.headers).some(k => k.toLowerCase() === 'authorization')) throw Error('PRIVATE_ERROR');
+    return new Response(JSON.stringify({ tag_name: 'v0.1.7', draft: false, prerelease: false }), { headers: { 'content-type': 'application/json' } });
+  };`);
+  const child = spawn(process.execPath, ['--import', preload, 'scripts/private-companion.mjs']);
+  let stdout = '', stderr = '';
+  child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
+  child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'check_plugin_version', arguments: {} } }) + '\n');
+  await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
+  const reply = JSON.parse(stdout); assert.ok(reply.result, stdout); assert.equal(reply.result.isError, undefined, stdout);
+  const value = JSON.parse(reply.result.content[0].text);
+  assert.ok(['current', 'update_available'].includes(value.status));
+  assert.equal(value.latest_version, '0.1.7');
+  assert.equal(stderr, ''); assert.ok(!stdout.includes('PRIVATE_ERROR'));
 });
