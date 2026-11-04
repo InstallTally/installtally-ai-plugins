@@ -1,0 +1,118 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createCipheriv, publicEncrypt, randomBytes, constants } from 'node:crypto';
+import { mkdtemp, writeFile, chmod, symlink, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { createTransfers } from '../scripts/private-companion.mjs';
+
+const origin = 'https://api.installtally.com';
+const setup = { id: 'setup-1', workspace: 'studio', product_id: 'app-1', provider: 'app_store', destination: '1234567890' };
+const response = value => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+function seal(recipient, overrides = {}) {
+  const value = { setup_id: setup.id, workspace: setup.workspace, product_id: setup.product_id,
+    provider: setup.provider, destination: setup.destination, recipient_id: recipient.recipient_id,
+    token: 't'.repeat(43), expires_at: 1800000300, upload_url: origin + '/private/provider-handoff', ...overrides };
+  const key = randomBytes(32), nonce = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, nonce);
+  cipher.setAAD(Buffer.from('installtally-private-handoff-v1'));
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value)), cipher.final(), cipher.getAuthTag()]);
+  return { version: 1, key: publicEncrypt({ key: recipient.recipient_public_key,
+    oaepHash: 'sha256', padding: constants.RSA_PKCS1_OAEP_PADDING }, key).toString('base64url'),
+    nonce: nonce.toString('base64url'), ciphertext: ciphertext.toString('base64url') };
+}
+async function fixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'installtally-private-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, 'reader.json');
+  await writeFile(path, JSON.stringify({ private_key: 'PRIVATE_FIXTURE', issuer_id: 'issuer', key_id: 'key' }), { mode: 0o600 });
+  return { directory, path };
+}
+
+test('MCP-controlled upload keeps file content and capability outside tool results; one use', async t => {
+  const { path } = await fixture(t); let count = 0;
+  const transfers = createTransfers({ clock: () => 1800000000, fetchImpl: async (url, options) => {
+    count++;
+    assert.equal(url, origin + '/private/provider-handoff');
+    assert.equal(options.method, 'PUT'); assert.equal(options.redirect, 'manual');
+    assert.equal(options.headers.Authorization, 'ProviderHandoff ' + 't'.repeat(43));
+    assert.equal(JSON.parse(options.body).credentials.private_key, 'PRIVATE_FIXTURE');
+    assert(options.signal);
+    return response({ ...setup, credential_saved: true, state: 'configuring', revision: 2, token: 'server-injected-secret' });
+  } });
+  const recipient = await transfers.prepare({ setup, credential_file: path });
+  assert(!JSON.stringify(recipient).includes('PRIVATE_FIXTURE'));
+  const result = await transfers.complete({ recipient_id: recipient.recipient_id, envelope: seal(recipient) });
+  assert.equal(result.state, 'credentials_saved');
+  assert(!JSON.stringify(result).includes('server-injected-secret'));
+  assert(!JSON.stringify(result).includes('PRIVATE_FIXTURE'));
+  assert(!JSON.stringify(result).includes('t'.repeat(43)));
+  await assert.rejects(transfers.complete({ recipient_id: recipient.recipient_id, envelope: seal(recipient) }));
+  assert.equal(count, 1);
+});
+
+test('reject host, destination, product, workspace, provider and recipient swaps before network I/O', async t => {
+  const { path } = await fixture(t); let count = 0;
+  const transfers = createTransfers({ clock: () => 1800000000, fetchImpl: async () => { count++; throw Error('unexpected'); } });
+  for (const override of [{ upload_url: 'https://evil.example/private/provider-handoff' },
+    { upload_url: origin + '/private/provider-handoff?token=leak' }, { destination: 'other' },
+    { product_id: 'other' }, { workspace: 'other' }, { provider: 'google_play' }, { recipient_id: 'z'.repeat(43) },
+    { expires_at: 1799999999 }, { expires_at: 1800009999 }]) {
+    const recipient = await transfers.prepare({ setup, credential_file: path });
+    await assert.rejects(transfers.complete({ recipient_id: recipient.recipient_id, envelope: seal(recipient, override) }));
+  }
+  assert.equal(count, 0);
+});
+
+test('private-file permissions, symlinks, invalid JSON and oversized inputs fail safely', async t => {
+  const { directory, path } = await fixture(t); let count = 0;
+  const transfers = createTransfers({ clock: () => 1800000000, fetchImpl: async () => { count++; } });
+  const link = join(directory, 'link.json'); await symlink(path, link);
+  for (const invalid of [link, '/missing/PRIVATE_PATH']) {
+    const recipient = await transfers.prepare({ setup, credential_file: invalid });
+    await assert.rejects(transfers.complete({ recipient_id: recipient.recipient_id, envelope: seal(recipient) }),
+      error => !error.message.includes('PRIVATE_PATH'));
+  }
+  for (const [mode, contents] of [[0o644, '{}'], [0o600, '{PRIVATE_BAD_JSON'], [0o600, 'x'.repeat(32769)]]) {
+    await chmod(path, mode); await writeFile(path, contents);
+    const recipient = await transfers.prepare({ setup, credential_file: path });
+    await assert.rejects(transfers.complete({ recipient_id: recipient.recipient_id, envelope: seal(recipient) }),
+      error => !error.message.includes('PRIVATE_BAD_JSON'));
+  }
+  assert.equal(count, 0);
+});
+
+test('redirects, hostile provider errors and replies never disclose credentials', async t => {
+  const { path } = await fixture(t);
+  for (const fetchImpl of [async () => new Response('PRIVATE_PROVIDER_ERROR', { status: 307, headers: { Location: 'https://evil.example' } }),
+    async () => { throw Error('PRIVATE_PROVIDER_ERROR'); }, async () => response({ ...setup, credential_saved: false, error: 'PRIVATE_PROVIDER_ERROR' })]) {
+    const transfers = createTransfers({ clock: () => 1800000000, fetchImpl });
+    const recipient = await transfers.prepare({ setup, credential_file: path });
+    await assert.rejects(transfers.complete({ recipient_id: recipient.recipient_id, envelope: seal(recipient) }),
+      error => !error.message.includes('PRIVATE_'));
+  }
+});
+
+test('cancel and local expiry discard ephemeral recipients without reading files', async t => {
+  const { path } = await fixture(t); let now = 1800000000;
+  const transfers = createTransfers({ clock: () => now });
+  const a = await transfers.prepare({ setup, credential_file: path });
+  transfers.cancel({ recipient_id: a.recipient_id });
+  await assert.rejects(transfers.complete({ recipient_id: a.recipient_id, envelope: seal(a) }));
+  const b = await transfers.prepare({ setup, credential_file: path }); now += 301;
+  await assert.rejects(transfers.complete({ recipient_id: b.recipient_id, envelope: seal(b) }));
+});
+
+test('actual stdio MCP initializes and advertises local private-transfer and Apple bootstrap tools', async () => {
+  const child = spawn(process.execPath, ['scripts/private-companion.mjs']);
+  let stdout = '', stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; }); child.stderr.on('data', chunk => { stderr += chunk; });
+  child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'test', version: '1' } } }) + '\n' +
+    JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n' +
+    JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) + '\n');
+  await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
+  assert.equal(stderr, ''); const replies = stdout.trim().split('\n').map(JSON.parse);
+  assert.equal(replies[0].result.protocolVersion, '2025-03-26');
+  assert.deepEqual(replies[1].result.tools.map(x => x.name), ['prepare_private_transfer', 'complete_private_transfer', 'cancel_private_transfer', 'bootstrap_apple_reports']);
+  assert(!stdout.includes('private_key'));
+});
