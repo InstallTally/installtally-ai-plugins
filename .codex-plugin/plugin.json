@@ -1,6 +1,6 @@
 {
   "name": "installtally",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Set up privacy-first app acquisition measurement and run read-only readiness diagnostics through MCP.",
   "author": {
     "name": "MYMOBI Roman Barzyczak",
@@ -30,8 +30,8 @@
     "websiteURL": "https://installtally.com",
     "privacyPolicyURL": "https://installtally.com/privacy/",
     "defaultPrompt": [
-      "Set up InstallTally for this app.",
-      "Run InstallTally doctor."
+      "Use the setup skill from the InstallTally plugin to configure this app and load its selected store-report skills.",
+      "Use the doctor skill from the InstallTally plugin to check this app without changing data."
     ],
     "logo": "./assets/icon.png"
   },

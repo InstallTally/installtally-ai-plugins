@@ -6,7 +6,7 @@ Set up free, privacy-first app acquisition measurement from your app repository.
 
 | Workflow | Purpose |
 | --- | --- |
-| `setup` | Connect MCP, reuse or register apps, configure ready platforms and explain remaining inputs |
+| `setup` | Load the selected store-report skills, connect MCP, reuse/register apps and verify the remaining setup |
 | `doctor` | Read-only checks of access, app configuration, campaign readiness and report evidence |
 | `setup-google-play-reports` (preview) | Guide and resume authorized Play report access using actual server capabilities |
 | `setup-app-store-reports` (preview) | Guide Apple reader setup and bootstrap an initial report request with an approved local helper |
@@ -14,6 +14,8 @@ Set up free, privacy-first app acquisition measurement from your app repository.
 The provider skills and local Apple helper are open source under Apache-2.0. They are in development: managed Google readers and Apple pending-reader storage are not enabled on the released service. The skills detect this limitation and retain the existing private owner forms. Helper tests use controlled API responses; native provider onboarding and scheduled-import acceptance remain outstanding. No preview skill is proof of live provider access.
 
 Setup first asks whether you want iOS, Android or both. Run it again to resume: it reads the existing app, links and report sources and requests only missing inputs or permissions. A report still being generated is reported as pending.
+
+Use plugin0.1.3or later and start a new agent session after installation/update. `setup` must load `setup-app-store-reports` for iOS and `setup-google-play-reports` for Android before their provider actions. If a required skill is missing, it stops that provider workflow and explains how to update; it does not substitute generic instructions. The final report distinguishes loaded skills from actions actually executed. Connecting only the MCP endpoint does not install these skills.
 
 One account can have multiple apps. Keep the iOS and Android versions of the same app in one product. An Apple campaign provider token can be added later; Android setup is independent.
 
@@ -26,6 +28,8 @@ claude plugin install installtally@installtally
 
 Start a new Claude Code session and run `/installtally:setup` or `/installtally:doctor`. Use `/mcp` to complete browser OAuth when requested. Review the selected workspace and requested permissions.
 
+For an existing app, you can explicitly run `/installtally:setup-app-store-reports` or `/installtally:setup-google-play-reports`. To update an older install, run `claude plugin marketplace update installtally`, then `claude plugin update installtally@installtally`, and restart the session.
+
 ## Codex
 
 ```sh
@@ -33,7 +37,7 @@ codex plugin marketplace add InstallTally/installtally-ai-plugins
 codex plugin add installtally@installtally
 ```
 
-Start a new task and ask: **“Set up InstallTally for this app”** or **“Run InstallTally doctor.”** If your Codex version does not have `plugin`, use the direct MCP connection below. Client installation may ask you to trust this marketplace.
+Start a new task and ask: **“Load the setup skill from the InstallTally plugin for this app, then load its selected store-report skills.”** For diagnosis, ask for the plugin's `doctor` skill. To update an older install, run `codex plugin marketplace upgrade installtally`, then `codex plugin add installtally@installtally`, and start a new session. Client installation may ask you to trust this marketplace. If your client lacks plugins, the direct MCP connection below provides data tools; install the official skills separately before using the guided store workflows.
 
 ## Direct MCP connection
 
