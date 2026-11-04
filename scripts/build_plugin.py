@@ -18,6 +18,7 @@ FILES = (
     "LICENSE",
     "skills/setup/SKILL.md",
     "skills/setup/agents/openai.yaml",
+    "scripts/check-plugin-version.mjs",
     "skills/doctor/SKILL.md",
     "skills/doctor/agents/openai.yaml",
     "skills/setup-google-play-reports/SKILL.md",

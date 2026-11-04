@@ -7,6 +7,13 @@ description: Diagnose InstallTally MCP access, app configuration, campaign readi
 
 Run read-only checks through the existing selected connection. Do not install a plugin, authenticate, change workspace selection, register/update/archive apps or links, import data, sync sources, retry jobs, rotate/disconnect keys, or change ads/budgets. If authentication is missing, report the blocker and point to `setup`; do not start login during this diagnosis. Do not print credentials.
 
+## Check the loaded plugin version
+
+Once per top-level doctor, run the bundled [version checker](../../scripts/check-plugin-version.mjs) from the loaded plugin's absolute path. Reuse the current invocation's setup result when present. It reads only own manifests and public release metadata. `current`/`ahead`: no update question or downgrade. `update_available`: report installed/latest and release URL, offer an update as a separate action; doctor never installs or updates. `unknown`, offline or missing Node: report unverified/NOT RUN and continue authorized diagnostics. Never request GitHub credentials or install a runtime. Do not claim an old installed skill has acquired a new preflight without a one-time update and new session.
+
+Never open a browser or login/consent URL. Missing authorization is a blocker, not permission to start a login flow.
+
+
 ## Establish the target
 
 Inspect client MCP connection state and available tools using the current client's documented read controls. Verify actual authenticated access with `list_products`; public health200 is insufficient. Select the product requested by the user. If multiple products/workspaces match, report the ambiguity before app-specific checks. Do not imply access to unrelated workspaces or provider accounts.
