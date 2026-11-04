@@ -11,6 +11,8 @@ Load and follow [private MCP credential transfer](../setup/references/private-tr
 
 Use an existing Sales and Reports team reader explicitly selected by the owner. Explain its team-wide access and confirm the intended Apple team/app. Apple does not document report OAuth or API key creation through REST; this skill cannot manufacture a new provider credential. If no authorized reader exists, report `needs_provider_credential` and continue independently ready work. Never silently reuse publishing credentials or upload an Admin key as the permanent reader. Keys remain in privately selected local files; request a path/authorization, never contents.
 
+When no reader is saved, automatically load and follow [prepare-store-access](../prepare-store-access/SKILL.md) before requesting finished JSON files. Reuse any existing approval for the exact files, provider identity and destination. It prepares approved local readers and returns here for transfer and verification; it does not manufacture missing provider authority.
+
 ## Resume report discovery
 
 After private transfer, call remote `advance_provider_setup(setup_id)`. It discovers an active ONGOING request for the registered app, selects one App Store Downloads Detailed definition and binds DAILY reporting. Do not ask users to copy request/report/source IDs or choose report variants. Existing source credentials are reused; paused/disconnected sources remain paused/disconnected.

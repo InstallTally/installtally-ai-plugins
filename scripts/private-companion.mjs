@@ -6,6 +6,7 @@ import { isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { bootstrap, BootstrapError, loadCredential } from '../skills/setup-app-store-reports/scripts/apple-bootstrap.mjs';
+import { prepareAppleReader, createGoogleReaderKey, inspectGoogleContext, StoreAccessError } from './store-access.mjs';
 
 const AAD = Buffer.from('installtally-private-handoff-v1');
 const ID = /^[A-Za-z0-9_-]{43}$/;
@@ -107,6 +108,11 @@ export function createTransfers({ apiOrigin = 'https://api.installtally.com', fe
 const string = { type: 'string' };
 const object = properties => ({ type: 'object', additionalProperties: false, properties, required: Object.keys(properties) });
 const tools = [
+  { name: 'inspect_google_context', description: 'Read only the current local gcloud account and project configuration. Returns validated nonsecret metadata, never tokens, and does not verify authentication, enumerate accounts, log in or change configuration.', inputSchema: object({}) },
+  { name: 'prepare_apple_reader', description: 'Package an owner-selected existing Apple Sales and Reports p8 key into a private reader JSON without exposing its contents. Does not create an Apple key, verify its role, upload it or authorize transfer. Output is outside version control; repeated calls reuse the same reader.',
+    inputSchema: object({ issuer_id: string, key_id: string, private_key_path: string, private_directory: string, acknowledge_sales_reader: { type: 'boolean' } }) },
+  { name: 'create_google_reader_key', description: 'Create one private JSON key for an explicitly approved existing Google service account using the selected already-authorized local gcloud account. Requires action-specific approval. Does not create projects/accounts, grant IAM/Play access or upload the key. Reuses a completed result; uncertain creation blocks retries.',
+    inputSchema: object({ account: string, project_id: string, service_account: string, private_directory: string, approve_create: { type: 'boolean' } }) },
   { name: 'prepare_private_transfer', description: 'Prepare an ephemeral local recipient for one explicitly selected private reader credential file. Only the absolute file path and nonsecret setup state are arguments. Does not read or return the credential. Requires user authorization for the selected file and destination.',
     inputSchema: object({ setup: object({ id: string, workspace: string, product_id: string, provider: { enum: ['app_store', 'google_play'] }, destination: string }), credential_file: string }) },
   { name: 'complete_private_transfer', description: 'Open the encrypted owner-authorized envelope in memory and upload the selected file directly to the configured InstallTally API over TLS. Never returns file content or capability. A successful save does not prove provider access or report imports.',
@@ -114,7 +120,7 @@ const tools = [
   { name: 'cancel_private_transfer', description: 'Discard an ephemeral local recipient. Does not remove existing remote connections or provider permissions.', inputSchema: object({ recipient_id: string }) },
   { name: 'bootstrap_apple_reports', description: 'Use an explicitly selected private local Admin credential manifest to read/reuse an ONGOING Analytics request for the selected app. Create only with explicit approve_create authorization. Admin key stays local; no browser or key upload. Returns safe request state.',
     inputSchema: object({ app_id: string, credential_manifest: string, approve_create: { type: 'boolean' } }) }
-].map(tool => ({ ...tool, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: tool.name !== 'cancel_private_transfer' } }));
+].map(tool => ({ ...tool, annotations: { readOnlyHint: tool.name === 'inspect_google_context', destructiveHint: false, openWorldHint: !['cancel_private_transfer', 'inspect_google_context', 'prepare_apple_reader'].includes(tool.name) } }));
 
 export async function serve() {
   const transfers = createTransfers({ apiOrigin: process.env.INSTALLTALLY_API_ORIGIN || 'https://api.installtally.com' });
@@ -128,7 +134,7 @@ export async function serve() {
       let result;
       if (message.method === 'initialize') {
         if (!['2024-11-05', '2025-03-26', '2025-06-18', '2025-11-25'].includes(message.params?.protocolVersion)) fail('protocol');
-        result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'installtally-private', version: '0.1.5' } };
+        result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'installtally-private', version: '0.1.6' } };
       } else if (message.method === 'ping') result = {};
       else if (message.method === 'tools/list') result = { tools };
       else if (message.method === 'tools/call') {
@@ -141,6 +147,9 @@ export async function serve() {
           if (name === 'prepare_private_transfer') value = await transfers.prepare(args);
           if (name === 'complete_private_transfer') value = await transfers.complete(args);
           if (name === 'cancel_private_transfer') value = transfers.cancel(args);
+          if (name === 'inspect_google_context') value = await inspectGoogleContext();
+          if (name === 'prepare_apple_reader') value = await prepareAppleReader(args);
+          if (name === 'create_google_reader_key') value = await createGoogleReaderKey(args);
           if (name === 'bootstrap_apple_reports') {
             if (typeof args.approve_create !== 'boolean') fail('approval');
             value = await bootstrap({ appId: args.app_id, credential: await loadCredential(args.credential_manifest), approveCreate: args.approve_create });
@@ -148,7 +157,7 @@ export async function serve() {
           result = { content: [{ type: 'text', text: JSON.stringify(value) }] };
         } catch (error) {
           // Only helper-defined codes are safe; never serialize provider errors or file paths.
-          const text = name === 'bootstrap_apple_reports' && error instanceof BootstrapError
+          const text = (name === 'bootstrap_apple_reports' && error instanceof BootstrapError) || error instanceof StoreAccessError
             ? JSON.stringify({ error_code: error.code })
             : 'Private MCP operation did not complete. Check the selected private file, permission, setup status and authorization; secrets are never returned.';
           result = { isError: true, content: [{ type: 'text', text }] };

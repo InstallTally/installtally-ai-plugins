@@ -174,6 +174,7 @@ test('actual stdio MCP initializes and advertises local private-transfer and App
   await new Promise((resolve, reject) => { child.on('error', reject); child.on('exit', resolve); });
   assert.equal(stderr, ''); const replies = stdout.trim().split('\n').map(JSON.parse);
   assert.equal(replies[0].result.protocolVersion, '2025-03-26');
-  assert.deepEqual(replies[1].result.tools.map(x => x.name), ['prepare_private_transfer', 'complete_private_transfer', 'cancel_private_transfer', 'bootstrap_apple_reports']);
-  assert(!stdout.includes('private_key'));
+  assert.deepEqual(replies[1].result.tools.map(x => x.name), ['inspect_google_context', 'prepare_apple_reader', 'create_google_reader_key', 'prepare_private_transfer', 'complete_private_transfer', 'cancel_private_transfer', 'bootstrap_apple_reports']);
+  assert(!stdout.includes('"private_key"'));
+  assert(!stdout.includes('BEGIN PRIVATE KEY'));
 });
