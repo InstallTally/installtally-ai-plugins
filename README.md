@@ -11,17 +11,13 @@ Set up free, privacy-first app acquisition measurement from your app repository.
 | `setup-google-play-reports` (preview) | Guide and resume authorized Play report access using actual server capabilities |
 | `setup-app-store-reports` (preview) | Guide Apple reader setup and bootstrap an initial report request with an approved local helper |
 
-The provider skills and local Apple helper are open source under Apache-2.0. They are in development: managed Google readers and Apple pending-reader storage are not enabled on the released service. The skills detect this limitation and retain the existing private owner forms. Helper tests use controlled API responses; native provider onboarding and scheduled-import acceptance remain outstanding. No preview skill is proof of live provider access.
+The provider skills and local helpers are open source under Apache-2.0. This0.1.4candidate adds MCP-driven private reader transfer and resume/discovery, without browser fallback. The hosted release is still 0.1.3 and does not enable this new transfer. Native client/provider and scheduled-import acceptance remain outstanding. No preview skill proves live provider access.
 
 Setup first asks whether you want iOS, Android or both. Run it again to resume: it reads the existing app, links and report sources and requests only missing inputs or permissions. A report still being generated is reported as pending.
 
-Use plugin0.1.3or later and start a new agent session after installation/update. `setup` must load `setup-app-store-reports` for iOS and `setup-google-play-reports` for Android before their provider actions. If a required skill is missing, it stops that provider workflow and explains how to update; it does not substitute generic instructions. The final report distinguishes loaded skills from actions actually executed. Connecting only the MCP endpoint does not install these skills.
+Use version 0.1.4 or later for private MCP transfer and start a new agent session after installation/update. `setup` must load `setup-app-store-reports` for iOS and `setup-google-play-reports` for Android before their provider actions. If a required skill is missing, it stops that provider workflow and explains how to update; it does not substitute generic instructions. The final report distinguishes loaded skills from actions actually executed. Connecting only the MCP endpoint does not install these skills.
 
 One account can have multiple apps. Keep the iOS and Android versions of the same app in one product. An Apple campaign provider token can be added later; Android setup is independent.
-
-## Version preflight
-
-The0.1.4candidate checks its own installed manifests against the latest stable public GitHub release once per setup/doctor invocation. It sends no credentials and executes no update. Only a newer stable release prompts an update offer; offline/rate-limited/unknown checks continue without claiming current. Owner-approved updates require a new session. Doctor stays read-only and offers updates as a separate action. Older installations need one update/new session to acquire this preflight. No auto-update setting is changed. Node22.17+ or24 is required; a missing runtime leaves the check NOT RUN rather than installing software automatically.
 
 ## Claude Code
 
@@ -30,7 +26,7 @@ claude plugin marketplace add InstallTally/installtally-ai-plugins
 claude plugin install installtally@installtally
 ```
 
-Start a new Claude Code session and run `/installtally:setup` or `/installtally:doctor`. Use `/mcp` to complete browser OAuth when requested. Review the selected workspace and requested permissions.
+Start a new Claude Code session and run `/installtally:setup` or `/installtally:doctor`. Reuse the existing authorized owner MCP connection. The store workflows never open a browser; missing first-time identity/consent is reported as a prerequisite.
 
 For an existing app, you can explicitly run `/installtally:setup-app-store-reports` or `/installtally:setup-google-play-reports`. To update an older install, run `claude plugin marketplace update installtally`, then `claude plugin update installtally@installtally`, and restart the session.
 
@@ -61,13 +57,17 @@ Or, in Claude Code:
 claude mcp add --transport http installtally https://api.installtally.com/mcp
 ```
 
-Follow your client's OAuth flow. A saved configuration is not proof of access: the setup workflow verifies `list_products`. Read-only authorization is enough for `doctor`; setup writes need the `fpmeasure:read` and `fpmeasure:write` scopes. Revoke access in the customer panel's **AI connections** page.
+Reuse an already authorized owner connection for browserless store setup. The private MCP workflow never opens an OAuth/login URL; first-time account/consent remains a separate prerequisite. A saved configuration is not proof of access: the setup workflow verifies `list_products`. Read-only authorization is enough for `doctor`; setup writes need the `fpmeasure:read` and `fpmeasure:write` scopes. Revoke access in the customer panel's **AI connections** page.
 
 ## What setup can verify
 
 The agent reads the current app repository for store identifiers and reuses matching registered apps. It can register apps, add an initial missing Apple `pt` campaign tag, create ready test links when campaign tags are known, and inspect reports. It reports unsupported changes to existing store destinations instead of replacing the app or its links.
 
-Setup includes provider report connections from the start. Google Play and App Store report access requires separate provider permissions and configuration in the private owner panel. For Apple, an Admin creates an `ONGOING` report request; a `Sales and Reports` team key can read it. Select App Store Downloads Detailed for its `Campaign` (`ct`) dimension. The public `pt` campaign-link tag is independent of report access.
+Setup routes through the provider skills and a local private MCP companion. It never opens the customer panel or provider browser. An explicitly selected reader file is transferred directly over TLS; raw keys and plaintext upload capabilities never enter MCP arguments/results or model context. Read [the private transfer workflow](skills/setup/references/private-transfer.md). The installed local companion requires Node 22.17+ or 24 and can be registered by the setup skill using the client CLI; reload/new session is required before using newly registered tools.
+
+Version 0.1.4 requires an enabled backend with `begin_provider_setup`, `prepare_provider_handoff` and `advance_provider_setup`. It discovers Apple ONGOING requests and Detailed/DAILY reports and reuses existing connections. Pending Apple readers are saved; rerun advance after report generation. Automatic background binding, managed Google reader provisioning, browserless first-time identity/consent and provider key creation are not implemented. Existing Google report permission and a verified report bucket remain prerequisites. Do not substitute browser automation when prerequisites are missing. A connected source is not a real report import.
+
+On setup/doctor startup, the bundled checker compares its own manifest version to the public latest stable GitHub release. No credentials are read or sent. Only a newer stable release prompts an update offer; offline/unknown checks continue without claiming current. Updates need approval and a new session; doctor never installs or updates. An older installed release needs a one-time update to obtain this check. No auto-update setting is changed.
 
 To obtain `pt`: App Store Connect → Apps → your app → Analytics → Acquisition → Campaigns → **+**. Enter a campaign name, copy the generated link, and read its `pt=` value. Apple documents this one-time link-generation flow, not a public provider-token lookup API. See [Apple's instructions](https://developer.apple.com/help/app-store-connect-analytics/acquisition/campaign-links). Never paste provider keys, account passwords or OAuth codes into chat, this repository or plugin settings.
 
@@ -92,7 +92,7 @@ claude plugin validate .claude-plugin/marketplace.json --strict --json
 python3 scripts/build_plugin.py --output dist/installtally-ai-plugin.zip
 ```
 
-The optional Apple bootstrap helper and its tests use Node.js 22.17+ or 24. Run `node --test tests/apple_bootstrap.test.mjs` in this repository. It reads an explicitly selected private manifest and key locally; an Admin key is never uploaded to InstallTally.
+The optional Apple bootstrap helper and its tests use Node.js 22.17+ or 24. Run `node --test tests/*.test.mjs` in this repository. It reads an explicitly selected private manifest and key locally; an Admin key is never uploaded to InstallTally.
 
 Load a local checkout in Claude Code with `claude --plugin-dir /absolute/path/to/installtally-ai-plugins`. For Codex, register that directory with `codex plugin marketplace add /absolute/path/to/installtally-ai-plugins`, then install `installtally@installtally`.
 

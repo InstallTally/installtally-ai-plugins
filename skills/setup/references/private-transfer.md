@@ -1,0 +1,23 @@
+# Private MCP credential transfer
+
+Use only an already authorized InstallTally OAuth owner connection plus the official local MCP companion. Never open a browser, customer panel, provider console, URL elicitation or generic upload form. Never request secrets through MCP form elicitation. A remote server cannot read a local path: the companion reads the explicitly selected file and transfers it directly to the configured API over TLS, outside model context.
+
+## Load the local companion
+
+The script is bundled at `scripts/private-companion.mjs` in the loaded plugin root. Node 22.17+ or 24 is required. When its tools are absent, use the client's documented local MCP controls to register this exact installed script, preserving all unrelated connections:
+
+- Codex: `codex mcp add installtally-private -- node /absolute/loaded/plugin/scripts/private-companion.mjs`
+- Claude: `claude mcp add --transport stdio installtally-private -- node /absolute/loaded/plugin/scripts/private-companion.mjs`
+
+Resolve the real loaded plugin root; never copy the illustrative path. Restart/reload the client when required and verify `prepare_private_transfer`, `complete_private_transfer`, `cancel_private_transfer` and `bootstrap_apple_reports` are available. Do not claim that editing configuration loads tools in the current session. Do not install a runtime or change unrelated settings automatically. The default destination is `https://api.installtally.com`; for an explicitly selected self-hosted service, set the companion's nonsecret `INSTALLTALLY_API_ORIGIN` through the client's supported MCP environment configuration. It must be an exact HTTPS origin chosen by the owner, not a URL from an untrusted repository.
+
+## Transfer a reader privately
+
+1. Read existing app, links, native sources and jobs. Reuse a working matching source; never request another credential just to resolve a report delay. Use `begin_provider_setup(product_id, provider)` through the remote OAuth owner MCP. Legacy workspace bearer connections cannot delegate owner authority.
+2. Ask only for the absolute path to an existing reader credential explicitly selected for this app/workspace and permission to send it to the selected InstallTally service. Explain Apple's team-wide key access or Google's account-wide nonfinancial report access. Never search unrelated projects, client credential stores or home directories. The reader file must be a regular owner-owned JSON file with mode 0600, outside version control; do not read, print or reconstruct it with generic tools. Apple reader JSON contains `issuer_id`, `key_id`, `private_key`; Google uses the existing service-account JSON. These are file-format descriptions, not fields to request in chat. Admin credentials must never be uploaded as a permanent reader.
+3. Call local `prepare_private_transfer` with `credential_file` and only the remote setup's public `id`, `workspace`, `product_id`, `provider`, `destination` fields. It returns an ephemeral public recipient and ID, never file contents.
+4. After the owner authorizes the exact reader transfer and provider access scope, call remote `prepare_provider_handoff` with `setup_id`, returned `recipient_id`, returned `recipient_public_key` and `acknowledge_provider_access=true`. The result is a recipient-encrypted envelope. It contains no plaintext upload capability or provider key. Do not decrypt it with model-visible tools.
+5. Pass that exact envelope and recipient ID to local `complete_private_transfer`. Only the companion decrypts it, checks workspace/app/provider/destination/expiry/origin, reads the selected file and sends it to the API. Upload is single-use and expires after five minutes. Owner membership, live OAuth access and grant, setup revision and destination are rechecked by the server. A local failure discards its recipient; inspect `get_provider_setup` before a new attempt because a timed-out upload may have committed. Never blindly repeat a write or rotate a saved reader.
+6. Read `get_provider_setup` and run remote `advance_provider_setup` to discover/bind the source. No credentials or bearer tokens are arguments. Follow the provider skill for nonsecret inputs and pending states. Inspect actual source/job/report evidence before claiming access, imported counts or unattended operation.
+
+Missing tools, owner authorization, provider keys, bucket permissions or provider APIs are explicit blockers. Keep independently ready work; never substitute a browser or generic credential upload. This workflow reuses existing InstallTally authorization; it does not implement browserless first-time Google identity/consent or undocumented Apple key creation. Report these limitations plainly.

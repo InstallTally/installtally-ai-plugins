@@ -10,14 +10,14 @@ const BASE = 'https://api.appstoreconnect.apple.com';
 const MAX_BYTES = 512 * 1024;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 
-class BootstrapError extends Error {
+export class BootstrapError extends Error {
   constructor(code) { super(`Apple bootstrap failed (${code})`); this.code = code; }
 }
 const fail = code => { throw new BootstrapError(code); };
 
 async function privateFile(path, maximum) {
   if (typeof path !== 'string' || !isAbsolute(path)) fail('configuration');
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const info = await handle.stat();
     if (!info.isFile() || info.size > maximum || (process.platform !== 'win32' && (info.mode & 0o077))) fail('configuration');
