@@ -5,7 +5,7 @@ import { open, realpath } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
-import { bootstrap, loadCredential } from '../skills/setup-app-store-reports/scripts/apple-bootstrap.mjs';
+import { bootstrap, BootstrapError, loadCredential } from '../skills/setup-app-store-reports/scripts/apple-bootstrap.mjs';
 
 const AAD = Buffer.from('installtally-private-handoff-v1');
 const ID = /^[A-Za-z0-9_-]{43}$/;
@@ -146,7 +146,13 @@ export async function serve() {
             value = await bootstrap({ appId: args.app_id, credential: await loadCredential(args.credential_manifest), approveCreate: args.approve_create });
           }
           result = { content: [{ type: 'text', text: JSON.stringify(value) }] };
-        } catch { result = { isError: true, content: [{ type: 'text', text: 'Private MCP operation did not complete. Check the selected private file, permission, setup status and authorization; secrets are never returned.' }] }; }
+        } catch (error) {
+          // Only helper-defined codes are safe; never serialize provider errors or file paths.
+          const text = name === 'bootstrap_apple_reports' && error instanceof BootstrapError
+            ? JSON.stringify({ error_code: error.code })
+            : 'Private MCP operation did not complete. Check the selected private file, permission, setup status and authorization; secrets are never returned.';
+          result = { isError: true, content: [{ type: 'text', text }] };
+        }
       } else { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: 'Method not found' } }) + '\n'); continue; }
       process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }) + '\n');
     } catch {

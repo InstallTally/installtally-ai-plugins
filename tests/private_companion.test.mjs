@@ -1,15 +1,76 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createCipheriv, publicEncrypt, randomBytes, constants } from 'node:crypto';
+import { createCipheriv, publicEncrypt, randomBytes, constants, generateKeyPairSync } from 'node:crypto';
 import { mkdtemp, writeFile, chmod, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createTransfers } from '../scripts/private-companion.mjs';
 
 const origin = 'https://api.installtally.com';
 const setup = { id: 'setup-1', workspace: 'studio', product_id: 'app-1', provider: 'app_store', destination: '1234567890' };
 const response = value => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+
+async function bootstrapManifest(directory, privateKeyPath) {
+  const manifest = join(directory, 'admin.json');
+  if (!privateKeyPath) {
+    privateKeyPath = join(directory, 'admin.p8');
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    await writeFile(privateKeyPath, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+  }
+  await writeFile(manifest, JSON.stringify({ issuer_id: '12345678-1234-1234-1234-123456789012',
+    key_id: 'ABCDEFGHIJ', private_key_path: privateKeyPath }), { mode: 0o600 });
+  return manifest;
+}
+
+async function callBootstrap(manifest, mockFetch, approveCreate = false) {
+  const child = spawn(process.execPath, ['--input-type=module', '-e',
+    `${mockFetch}; const { serve } = await import('./scripts/private-companion.mjs'); await serve();`]);
+  let stdout = '', stderr = '', timedOut = false;
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, 3000);
+  const closed = new Promise((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
+  child.stdin.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {
+    name: 'bootstrap_apple_reports', arguments: { app_id: '1234567890',
+      credential_manifest: manifest, approve_create: approveCreate }
+  } }) + '\n' + JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'ping' }) + '\n');
+  try { await closed; } finally { clearTimeout(timer); }
+  assert.equal(timedOut, false, 'bootstrap must reject invalid files without blocking subsequent MCP requests');
+  assert.equal(stderr, '');
+  assert(!stdout.includes('PRIVATE_PROVIDER_ERROR'));
+  assert(!stdout.includes(manifest));
+  const replies = stdout.trim().split('\n').map(JSON.parse);
+  assert.deepEqual(replies[1], { jsonrpc: '2.0', id: 2, result: {} });
+  assert.equal(replies[0].result.isError, true);
+  const text = replies[0].result.content[0].text;
+  return text.startsWith('{') ? JSON.parse(text) : { message: text };
+}
+
+test('stdio bootstrap preserves safe provider failure codes without exposing provider errors', async t => {
+  const { directory } = await fixture(t);
+  const manifest = await bootstrapManifest(directory);
+  for (const [status, code] of [[401, 'authentication'], [403, 'permission'], [429, 'rate_limited']]) {
+    const result = await callBootstrap(manifest,
+      `globalThis.fetch = async () => new Response('PRIVATE_PROVIDER_ERROR', { status: ${status} })`);
+    assert.equal(result.error_code, code);
+  }
+  const result = await callBootstrap(manifest, `globalThis.fetch = async (url, options) => {
+    if (options.method === 'POST') throw Error('PRIVATE_PROVIDER_ERROR');
+    return new Response(JSON.stringify({ data: [] }), { headers: { 'Content-Type': 'application/json' } });
+  }`, true);
+  assert.equal(result.error_code, 'creation_status_unknown');
+});
+
+test('stdio bootstrap rejects FIFO manifests and keys without blocking ping', { skip: process.platform === 'win32' }, async t => {
+  const { directory } = await fixture(t);
+  const fifo = join(directory, 'private.fifo');
+  execFileSync('mkfifo', [fifo]);
+  const noNetwork = `globalThis.fetch = async () => { throw Error('PRIVATE_PROVIDER_ERROR'); }`;
+  assert.equal((await callBootstrap(fifo, noNetwork)).error_code, 'configuration');
+  const manifest = await bootstrapManifest(directory, fifo);
+  assert.equal((await callBootstrap(manifest, noNetwork)).error_code, 'configuration');
+});
 function seal(recipient, overrides = {}) {
   const value = { setup_id: setup.id, workspace: setup.workspace, product_id: setup.product_id,
     provider: setup.provider, destination: setup.destination, recipient_id: recipient.recipient_id,
